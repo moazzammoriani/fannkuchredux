@@ -6,6 +6,9 @@
  *
  * (Based on the Java version by Oleg Mazurov)
  *)
+(*let num_domains = 4
+
+module T = Domainslib.Task*)
 
 let workers = 32
 
@@ -38,7 +41,7 @@ module Perm =
     done;
     res
   (* Getting the next permutation *)
-  let next { p = p; c = c } =
+  let next { p = p; c = c; _ } =
     let f = ref p.(1) in
     p.(1) <- p.(0);
     p.(0) <- !f;
@@ -56,7 +59,7 @@ module Perm =
       f := n
     done
   (* Counting the number of flips *)
-  let count { p = p; pp = pp } =
+  let count { p = p ; pp = pp; _ } =
     let f = ref p.(0) and res = ref 1 in
     if p.(!f) <> 0 then begin
       let len = Array.length p in
@@ -81,38 +84,51 @@ module Perm =
     !res
   end
 
-let _ =
-  match Sys.argv with
-  | [| p; s_n |] ->
-    let n = int_of_string s_n in
-    let chunk_size = Perm.facts.(n) / workers
-    and rem = Perm.facts.(n) mod workers in
-    let w =
-      Array.init workers
-        (fun i ->
-          let lo = i * chunk_size + min i rem in
-          let hi = lo + chunk_size + if i < rem then 1 else 0 in
-          Unix.open_process_in (p ^ " " ^ s_n ^ " " ^ string_of_int lo ^ " " ^ string_of_int hi)) in
-    let c = ref 0 and m = ref 0 in
-    Array.iter
-      (fun input ->
-        c := !c + input_binary_int input;
-        m := max !m (input_binary_int input))
-      w;
-    Printf.printf "%d\nPfannkuchen(%d) = %d\n" !c n !m
+let fr argv = match argv with 
   | [| _; n; lo; hi |] ->
     let n = int_of_string n
     and lo = int_of_string lo and hi = int_of_string hi in
     let p = Perm.setup n lo
     and c = ref 0 and m = ref 0
     and red_hi = hi - 1 in
-    for i = lo to red_hi do
-      let r = Perm.count p in
+    for i = lo to red_hi do let r = Perm.count p in
       c := !c + r * (1 - (i land 1) lsl 1);
       if r > !m then
       m := r;
       Perm.next p
     done;
-    output_binary_int stdout !c;
-    output_binary_int stdout !m
+    (!c, !m)
+  | _ -> (0, 0)
+
+let main argv =
+  match argv with
+  | [| p; s_n |] ->
+    let n = int_of_string s_n in
+    let chunk_size = Perm.facts.(n) / workers
+    and rem = Perm.facts.(n) mod workers in
+    let w = ref (Array.init workers (fun _ -> (0, 0))) in
+    for i = 0 to (workers-1) do
+      let lo = i * chunk_size + min i rem in
+      let hi = lo + chunk_size + if i < rem then 1 else 0 in
+      !w.(i) <- fr [|p; s_n; string_of_int lo; string_of_int hi|]
+    done;
+    (*T.parallel_for pool ~start:0 ~finish:(workers-1) ~body:(fun i ->
+      Printf.printf "par_iter: %d\n" i;
+      let lo = i * chunk_size + min i rem in
+      let hi = lo + chunk_size + if i < rem then 1 else 0 in
+      !w.(i) <- fr [|p; s_n; string_of_int lo; string_of_int hi|]
+
+    );*) 
+    let c = ref 0 and m = ref 0 in
+    Array.iter
+      (fun (nc, nm) ->
+        c := !c + nc;
+        m := max !m nm)
+      !w;
+    Printf.printf "%d\nPfannkuchen(%d) = %d\n" !c n !m
   | _ -> Printf.printf "Wrong syntax\n%!"
+
+let _ =
+  (*let pool = T.setup_pool ~num_additional_domains:(num_domains - 1) () in*)
+  main (*pool*) [|"bleh"; "10"|];
+  (*T.teardown_pool pool*)

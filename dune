@@ -1,3 +1,17 @@
+;(executable 
+;  (name fannkuchredux) 
+;  (modules fannkuchredux)
+;  (modes byte exe)
+;  (libraries domainslib))
+
 (executable 
   (name fannkuchredux) 
-  (modules fannkuchredux))
+  (modules fannkuchredux)
+  (modes byte exe )
+  (libraries domainslib ) (ocamlopt_flags -noassert -unsafe))
+
+(executable 
+  (name f_orgnl) 
+  (modules f_orgnl)
+  (modes byte exe )
+  (libraries unix ) (ocamlopt_flags -noassert -unsafe))
