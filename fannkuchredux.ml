@@ -6,11 +6,13 @@
  *
  * (Based on the Java version by Oleg Mazurov)
  *)
+
+let workers = try int_of_string @@ Sys.argv.(1) with _ -> 1
+let n = try Sys.argv.(2) with _ -> "7"
+
 let num_domains = 4
 
 module T = Domainslib.Task
-
-let workers = num_domains
 
 module Perm =
   struct
@@ -100,9 +102,7 @@ let fr argv = match argv with
     (!c, !m)
   | _ -> (0, 0)
 
-let main pool argv =
-  match argv with
-  | [| p; s_n |] ->
+let main pool s_n =
     let n = int_of_string s_n in
     let chunk_size = Perm.facts.(n) / workers
     and rem = Perm.facts.(n) mod workers in
@@ -116,7 +116,7 @@ let main pool argv =
       Printf.printf "par_iter: %d\n" i;
       let lo = i * chunk_size + min i rem in
       let hi = lo + chunk_size + if i < rem then 1 else 0 in
-      !w.(i) <- fr [|p; s_n; string_of_int lo; string_of_int hi|]
+      !w.(i) <- fr [| " "; s_n; string_of_int lo; string_of_int hi|]
 
     ) );
     let c = ref 0 and m = ref 0 in
@@ -126,9 +126,8 @@ let main pool argv =
         m := max !m nm)
       !w;
     Printf.printf "%d\nPfannkuchen(%d) = %d\n" !c n !m
-  | _ -> Printf.printf "Wrong syntax\n%!"
 
 let _ =
   let pool = T.setup_pool ~num_additional_domains:(num_domains - 1) () in
-  main pool Sys.argv;
+  main pool n;
   T.teardown_pool pool
